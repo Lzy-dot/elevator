@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+	<title>电梯模拟</title>
+	<style type="text/css">
+		.tooltip {
+			display: block !important;
+			z-index: 10000;
+		}
+
+		.tooltip .tooltip-inner {
+			max-width: 100%;
+			background: black;
+			color: rgb(204, 130, 130);
+			border-radius: 16px;
+			padding: 5px 10px 4px;
+		}
+
+		.tooltip .tooltip-arrow {
+			width: 0;
+			height: 0;
+			border-style: solid;
+			position: absolute;
+			margin: 5px;
+			border-color: black;
+		}
+
+		.tooltip[x-placement^="top"] {
+			margin-bottom: 5px;
+		}
+
+		.tooltip[x-placement^="top"] .tooltip-arrow {
+			border-width: 5px 5px 0 5px;
+			border-left-color: transparent !important;
+			border-right-color: transparent !important;
+			border-bottom-color: transparent !important;
+			bottom: -5px;
+			left: calc(50% - 5px);
+			margin-top: 0;
+			margin-bottom: 0;
+		}
+
+		.tooltip[x-placement^="bottom"] {
+			margin-top: 5px;
+		}
+
+		.tooltip[x-placement^="bottom"] .tooltip-arrow {
+			border-width: 0 5px 5px 5px;
+			border-left-color: transparent !important;
+			border-right-color: transparent !important;
+			border-top-color: transparent !important;
+			top: -5px;
+			left: calc(50% - 5px);
+			margin-top: 0;
+			margin-bottom: 0;
+		}
+
+		.tooltip[x-placement^="right"] {
+			margin-left: 5px;
+		}
+
+		.tooltip[x-placement^="right"] .tooltip-arrow {
+			border-width: 5px 5px 5px 0;
+			border-left-color: transparent !important;
+			border-top-color: transparent !important;
+			border-bottom-color: transparent !important;
+			left: -5px;
+			top: calc(50% - 5px);
+			margin-left: 0;
+			margin-right: 0;
+		}
+
+		.tooltip[x-placement^="left"] {
+			margin-right: 5px;
+		}
+
+		.tooltip[x-placement^="left"] .tooltip-arrow {
+			border-width: 5px 0 5px 5px;
+			border-top-color: transparent !important;
+			border-right-color: transparent !important;
+			border-bottom-color: transparent !important;
+			right: -5px;
+			top: calc(50% - 5px);
+			margin-left: 0;
+			margin-right: 0;
+		}
+
+		.tooltip[aria-hidden='true'] {
+			visibility: hidden;
+			opacity: 0;
+			transition: opacity .15s, visibility .15s;
+		}
+
+		.tooltip[aria-hidden='false'] {
+			visibility: visible;
+			opacity: 1;
+			transition: opacity .15s;
+		}
+
+
+		body {
+			width: max(100%, 600px);
+			overflow: auto;
+			background-color: green;
+		}
+
+		.btn {
+			box-shadow: none !important;
+			/*去掉bootstrap按钮点击以后巨丑的阴影*/
+			overflow: hidden;
+			position: relative;
+		}
+
+		#frame {
+			width: auto;
+			background-color: #93a1c6;
+			/* position: absolute; */
+			margin-left: .5%;
+			/* margin-top: 2%; */
+			height: 100vh;
+			/*最外面框的样式，以后可能要设置居中什么的*/
+		}
+
+		.subFrame {
+			display: flex;
+		}
+
+		.colReverse {
+			display: flex;
+			flex-direction: column-reverse;
+		}
+
+		.btnsBox {
+			border: 1px black solid;
+		}
+
+		.door {
+			height: 100%;
+			transition: width .2s;
+		}
+		.ldoor{
+			float:left;
+			border-right: black 1px solid;
+		}
+		.rdoor{
+			float: right;
+			border-left: black 1px solid;
+		}
+	</style>
+	<link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/4.5.3/css/bootstrap.min.css" rel="stylesheet">
+	<script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.12/vue.min.js"></script>
+	<script src="https://unpkg.com/v-tooltip@2.0.2/dist/v-tooltip.min.js"></script>
+	<!-- <link href="bootstrap.min.css" rel="stylesheet"> -->
+	<!-- <script src="vue.min.js"></script> -->
+	<!-- <script src="v-tooltip.min.js"></script> -->
+</head>
+
+<body>
+	<div id="frame" class="subFrame">
+		<!--从左到右枚举每部电梯-->
+		<div v-for="i in eleNum" :style="{width:(90/eleNum)+'%',border:'1px black solid'}">
+			<div style="width: 100%;font-size: large;font-weight: 700;padding-left: 30%;">
+				{{i}}号梯在{{ele[i].elePos}}层
+			</div>
+			<div class="subFrame" style="margin-left: 23%;height: 95%">
+				<!--电梯内部的按钮框-->
+				<div class="colReverse btnsBox" style="background-color: #dead64;height: 100%">
+					<!--从下到上枚举电梯i内部每层楼的按钮-->
+					<button type="button" style="color: black;font-weight: 700;height: 100%;" v-for="j in floorNum"
+						:class="ele[i].eleBtnStatus[j]==btnStatuses.ON?btnOnClass:btnOffClass" @click="EBP(i,j)"
+						v-tooltip="{
+							content:'电梯'+i+'第'+j+'层按钮',
+							trigger:'hover'
+						}">
+						{{j}}
+					</button>
+				</div>
+				<!--电梯井-->
+				<div class="colReverse" style="width: 35%;">
+					<!--从下到上枚举电梯i的第j层楼的情况-->
+					<div v-for="j in floorNum" :style="{height:(100/floorNum)+'%',
+							border:ele[i].elePos==j?'1px black solid':'',
+							background:ele[i].elePos!=j?'#af3619':'#3d1a0b'}">
+						<!--电梯门和电梯内部的图片可以以后再加-->
+						<!--电梯i在第j层-->
+						<div v-if="ele[i].elePos==j"
+							style="
+								background:url(https://ss1.bdstatic.com/70cFuXSh_Q1YnxGkpoWK1HF6hhy/it/u=3942352980,3285303297&fm=26&gp=0.jpg) no-repeat;
+								height:100%;width: 100%;background-size:100% 100%;
+								overflow: hidden;"
+						>
+							<!--图片加在这里-->
+							<img class="door ldoor" :style="{width:(ele[i].eleStatus==eleStatuses.S||ele[i].eleStatus==eleStatuses.SS||ele[i].eleStatus==eleStatuses.SSS?0:49.9)+'%'}"
+							src="https://ss1.bdstatic.com/70cFvXSh_Q1YnxGkpoWK1HF6hhy/it/u=4153077028,2320065264&fm=26&gp=0.jpg"
+								
+							/>
+							<img class="door rdoor"  :style="{width:(ele[i].eleStatus==eleStatuses.S||ele[i].eleStatus==eleStatuses.SS||ele[i].eleStatus==eleStatuses.SSS?0:49.9)+'%'}"
+							src="https://ss1.bdstatic.com/70cFvXSh_Q1YnxGkpoWK1HF6hhy/it/u=4153077028,2320065264&fm=26&gp=0.jpg"
+							>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!--最右边的楼层按钮-->
+		<div>
+			<div style="width: 100%;font-size: large;font-weight: 700;">
+				楼梯间按钮
+			</div>
+			<div class="subFrame btnsBox">
+				<!--所有↑按钮所在的框-->
+				<div class="colReverse" style="width: 50%;background-color: #dead64;">
+					<!--从下到上枚举每层楼的↑按钮，顶楼的↑按钮不显示，但是要占位，不然布局不好搞-->
+					<button type="button" style="color: black;font-weight: 700;" v-for="i in floorNum"
+						:class="floor[i].floorBtnStatus[eleDirs.U]==btnStatuses.ON?btnOnClass:btnOffClass"
+						@click="FBP(eleDirs.U,i)" :style="{visibility:i!=floorNum?'visible':'hidden'}" v-tooltip="{
+							content:floor[i].floorBtnStatus[eleDirs.U]==btnStatuses.ON?
+								'请到'+floor[i].floorBtnEleId[eleDirs.U]+'号梯等待':
+								'第'+i+'层楼'+'上行按钮',
+							trigger:'hover'
+						}">
+						{{i}}↑
+					</button>
+				</div>
+				<!--所有↓按钮所在的框-->
+				<div class="colReverse" style="width: 50%;background-color: #dead64;">
+					<!--从下到上枚举每层楼的↓按钮，一楼的↓按钮不显示，但是要占位，不然布局不好搞-->
+					<button type="button" style="color: black;font-weight: 700;" v-for="i in floorNum"
+						:class="floor[i].floorBtnStatus[eleDirs.D]==btnStatuses.ON?btnOnClass:btnOffClass"
+						@click="FBP(eleDirs.D,i)" :style="{visibility:i!=1?'visible':'hidden'}" v-tooltip="{
+							content:floor[i].floorBtnStatus[eleDirs.D]==btnStatuses.ON?
+								('请到'+floor[i].floorBtnEleId[eleDirs.D]+'号梯等待'):
+								'第'+i+'层楼'+'下行按钮',
+							trigger:'hover'
+						}">
+						{{i}}↓
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script>
+		VTooltip.VTooltip.options.autoHide = false;
+		VTooltip.VTooltip.options.defaultHideOnTargetClick = false;
+		var eleStatuses = Object.freeze({ 'M': 1, 'S': 2, 'W': 3,'SS': 4,'SSS':5 });//电梯状态 关门运行 开门1 关门待机 开门2
+		var eleDirs = Object.freeze({ 'U': 0, 'D': 1, 'N': 2 });//电梯方向//可能可以改成1 -1 0  //楼梯按钮状态下标用了这套的前两个
+		var btnStatuses = Object.freeze({ "OFF": 0, 'ON': 1 });//按钮状态
+		new Vue({
+			el: '#frame',
+			data: {
+				eleNum: 5,//电梯数量
+				floorNum: 16,//楼层数量
+				ele: [],
+				floor: [],
+
+				// eleDir: [],//电梯方向：向上、向下、未定
+				// elePos: [],//电梯当前所在位置
+				// eleStatus: [],//电梯状态：开门、关门运行、关门待机
+				// eleBtnStatus: [],//电梯内部按钮状态（第i个电梯第j楼）
+				// floorBtnStatus: [],//楼梯按钮状态（第i层楼第floorBtnKind个按钮）
+				// floorBtnEleId: [],//楼梯按钮被分配到的电梯编号
+				// eleAids: [],//第一维dir，第二维e
+
+				btnOnClass: {
+					'btn': true,
+					'btn-danger': true
+				},
+				btnOffClass: {
+					'btn': true,
+					'btn-outline-secondary': true
+				},
+				timerDC: '',
+				timerST: ''
+			},
+			methods: {
+
+				//--------------------------------------状态区-------------------------------------------------
+
+				getEBON: function (eleId, floorId) { //电梯e的第f层按钮是否打开
+					return this.ele[eleId].eleBtnStatus[floorId] == btnStatuses.ON;
+				},
+				setEBON: function (eleId, floorId) { //电梯e的第f层按钮变成打开
+					this.$set(this.ele[eleId].eleBtnStatus, floorId, btnStatuses.ON);
+				},
+				getEBOFF: function (eleId, floorId) { //电梯e的第f层按钮是否关闭
+					return this.ele[eleId].eleBtnStatus[floorId] == btnStatuses.OFF;
+				},
+				setEBOFF: function (eleId, floorId) { //电梯e的第f层按钮变成关闭
+					this.$set(this.ele[eleId].eleBtnStatus, floorId, btnStatuses.OFF);
+				},
+				getFBON: function (dir, floorId) { //第f层第btn个按钮是否打开
+					return this.floor[floorId].floorBtnStatus[dir] == btnStatuses.ON;
+				},
+				setFBON: function (dir, floorId) { //第f层第btn个按钮变成打开
+					this.$set(this.floor[floorId].floorBtnStatus, dir, btnStatuses.ON);
+				},
+				getFBOFF: function (dir, floorId) { //第f层第btn个按钮是否关闭
+					return this.floor[floorId].floorBtnStatus[dir] == btnStatuses.OFF;
+				},
+				setFBOFF: function (dir, floorId) { //第f层第btn个按钮变成关闭
+					this.$set(this.floor[floorId].floorBtnStatus, dir, btnStatuses.OFF);
+				},
+				getM: function (dir, eleId, floorId) { //电梯e是否正在向dir移动，即将到达f
+					return this.ele[eleId].eleStatus == eleStatuses.M && this.ele[eleId].elePos == floorId && this.ele[eleId].eleDir == dir;
+				},
+				setM: function (dir, eleId, floorId) { //电梯e向dir移动，即将到达f
+					this.$set(this.ele[eleId], 'eleStatus', eleStatuses.M);
+					this.$set(this.ele[eleId], 'elePos', floorId);
+					this.$set(this.ele[eleId], 'eleDir', dir);
+				},
+				getS: function (dir, eleId, floorId) { //电梯e是否开着门停在f层，且移动方向为dir
+					return this.ele[eleId].elePos == floorId && this.ele[eleId].eleStatus == eleStatuses.S && this.ele[eleId].eleDir == dir;
+				},
+				setS: function (dir, eleId, floorId) { //电梯e在f开门等待，将向dir移动
+					this.$set(this.ele[eleId], 'eleStatus', eleStatuses.S);
+					this.$set(this.ele[eleId], 'elePos', floorId);
+					this.$set(this.ele[eleId], 'eleDir', dir);
+				},
+				getSS: function (dir, eleId, floorId) { //电梯e是否开着门停在f层，且移动方向为dir，第二阶段
+					return this.ele[eleId].elePos == floorId && this.ele[eleId].eleStatus == eleStatuses.SS && this.ele[eleId].eleDir == dir;
+				},
+				setSS: function (dir, eleId, floorId) { //电梯e在f开门等待，将向dir移动,第二阶段
+					this.$set(this.ele[eleId], 'eleStatus', eleStatuses.SS);
+					this.$set(this.ele[eleId], 'elePos', floorId);
+					this.$set(this.ele[eleId], 'eleDir', dir);
+				},
+				getSSS: function (dir, eleId, floorId) { //电梯e是否开着门停在f层，且移动方向为dir
+					return this.ele[eleId].elePos == floorId && this.ele[eleId].eleStatus == eleStatuses.SSS && this.ele[eleId].eleDir == dir;
+				},
+				setSSS: function (dir, eleId, floorId) { //电梯e在f开门等待，将向dir移动
+					this.$set(this.ele[eleId], 'eleStatus', eleStatuses.SSS);
+					this.$set(this.ele[eleId], 'elePos', floorId);
+					this.$set(this.ele[eleId], 'eleDir', dir);
+				},
+				getW: function (eleId, floorId) {//电梯e是否正在f关门待机
+					return this.ele[eleId].eleStatus == eleStatuses.W && this.ele[eleId].elePos == floorId && this.ele[eleId].eleDir == eleDirs.N;
+				},
+				setW: function (eleId, floorId) { //电梯e在f关门待机
+					this.$set(this.ele[eleId], 'eleStatus', eleStatuses.W);
+					this.$set(this.ele[eleId], 'elePos', floorId);
+					this.$set(this.ele[eleId], 'eleDir', eleDirs.N);
+				},
+
+				//--------------------------------------谓词区-------------------------------------------------
+
+				S: function (dir, eleId, floorId) { //电梯e是否 停在f层 开门 并且之后移动方向为d  //既是谓词又是状态(getS)
+					return this.getS(dir, eleId, floorId);
+				},
+				SS: function (dir, eleId, floorId) { //电梯e是否 停在f层 开门 并且之后移动方向为d  //既是谓词又是状态(getS)
+					return this.getSS(dir, eleId, floorId);
+				},
+				SSS: function (dir, eleId, floorId) { //电梯e是否 停在f层 开门 并且之后移动方向为d  //既是谓词又是状态(getS)
+					return this.getSSS(dir, eleId, floorId);
+				},
+				V: function (eleId, floorId) { //电梯e是否停在f层
+					return this.S(eleDirs.U, eleId, floorId) || this.S(eleDirs.D, eleId, floorId) || this.S(eleDirs.N, eleId, floorId);
+				},
+				NC: function (dir, eleId, floorId) {//电梯当前往dir运行，是否需要换方向(保证有目标存在)
+					let dir2 = eleDirs.N;
+					if (dir == eleDirs.D) dir2 = eleDirs.U;
+					else dir2 = eleDirs.D;
+					let aids1 = this.ele[eleId].eleAids[dir], aids2 = this.ele[eleId].eleAids[dir2];
+					if (aids1.length == 0) {//没有同向目标，一定有反向目标
+						return dir == eleDirs.U ? aids2[0] <= floorId : aids2[0] >= floorId;
+					}
+					else if (dir == eleDirs.U) {//正在向上
+						if (aids1[aids1.length - 1] < floorId) {//最高的向上目标在下面，就优先满足向下目标
+							if (aids2.length == 0) return true;//没有向下目标，需要反向
+							return aids2[0] > floorId;//向下目标有更高的，就不需要反向
+						}
+						else return false;//同向目标不要求反向
+					}
+					else {//正在向下
+						if (aids1[aids1.length - 1] > floorId) {//最低的向下目标在上面，就优先满足向上目标
+							if (aids2.length == 0) return true;//没有向上目标，需要反向
+							return aids2[0] < floorId;//向上目标有更低的，就不需要反向
+						}
+						else return false;//同向目标不要求反向
+					}
+				},
+				NA: function (eleId) {//失去了目标
+					return this.ele[eleId].eleAids[eleDirs.U].length == 0 && this.ele[eleId].eleAids[eleDirs.D].length == 0;
+				},
+
+				//--------------------------------------事件区-------------------------------------------------
+
+				// 事件驱动
+				EBP: function (eleId, floorId) { //按下电梯e的第f层按钮
+					if (this.getEBOFF(eleId, floorId) && !this.V(eleId, floorId)) {
+						this.setEBON(eleId, floorId);
+						//!V保证了floorId不等于elePos[e]
+						if (floorId < this.ele[eleId].elePos) {//下楼方向
+							this.RL(eleDirs.D, eleId, floorId);
+						}
+						else {//上楼方向
+							this.RL(eleDirs.U, eleId, floorId);
+						}
+					}
+				},
+				FBP: function (dir, floorId) { //按下楼层f的按钮kind
+					let prodNotS = true;
+					for (let i = 1; prodNotS && i <= this.eleNum; i++) {
+						prodNotS &= !this.S(dir, i, floorId);
+					}
+					if (this.getFBOFF(dir, floorId) && prodNotS) {
+						this.setFBON(dir, floorId);
+					}
+					let eleId = 0, mncost = 999999;
+					for (let i = 1; i <= this.eleNum; i++) {
+						//找到当前最高和最低目标
+						let mxaid = floorId, mnaid = floorId;
+						if (this.ele[i].eleAids[eleDirs.U].length > 0) {
+							mxaid = Math.max(mxaid, this.ele[i].eleAids[eleDirs.U][this.ele[i].eleAids[eleDirs.U].length - 1]);
+							mnaid = Math.min(mnaid, this.ele[i].eleAids[eleDirs.U][0]);
+						}
+						if (this.ele[i].eleAids[eleDirs.D].length > 0) {
+							mxaid = Math.max(mxaid, this.ele[i].eleAids[eleDirs.D][0]);
+							mnaid = Math.min(mnaid, this.ele[i].eleAids[eleDirs.D][this.ele[i].eleAids[eleDirs.D].length - 1]);
+						}
+
+						let cost = 0;
+						//根据运行路径计算代价
+						if (this.ele[i].eleDir == eleDirs.N) {//电梯没有任务，直接过去
+							cost = Math.abs(this.ele[i].elePos - floorId);
+						}
+						else if (this.ele[i].eleDir == dir) {//电梯和人同向
+							if (dir == eleDirs.U && this.ele[i].elePos <= floorId || dir == eleDirs.D && this.ele[i].elePos >= floorId) {
+								cost = Math.abs(floorId - this.ele[i].elePos);//电梯顺路
+							}
+							else {//电梯不顺路
+								//电梯上、人下:要上去到最高目标，再下到最低目标，最后才回到这里
+								//电梯下、人上:要下去到最低目标，再上到最高目标，最后才回到这里
+								cost = (mxaid - mnaid) * 2 - Math.abs(this.ele[i].elePos - floorId);
+							}
+						}
+						else {//电梯和人反向
+							if (dir == eleDirs.U) {//人要向上，电梯要向下
+								//下到最低目标再上来
+								cost = (this.ele[i].elePos + floorId) - mnaid * 2;
+							}
+							else {//人要向下，电梯要向上
+								//上到最高目标再下来
+								cost = mxaid * 2 - (this.ele[i].elePos + floorId);
+							}
+						}
+						//用新的cost更新最小cost
+						if (cost < mncost) {
+							eleId = i;
+							mncost = cost;
+						}
+					}
+					if (eleId == 0) {
+						console.log("啊这");
+						eleId = 1;
+					}
+					this.RL(dir, eleId, floorId);
+					this.$set(this.floor[floorId].floorBtnEleId, dir, eleId);
+				},
+				EAF: function (eleId, floorId) { //电梯e已经到f层，并且处于S态
+					if (this.getEBON(eleId, floorId)) {
+						this.setEBOFF(eleId, floorId);
+					}
+					for (dir of [eleDirs.U, eleDirs.D]) {//通向按钮关闭
+						if (this.S(dir, eleId, floorId)) {
+							if (this.getFBON(dir, floorId))
+								this.setFBOFF(dir, floorId);//关闭按钮
+							let ind = this.ele[eleId].eleAids[dir].indexOf(floorId);
+							if (ind != -1)
+								this.ele[eleId].eleAids[dir].splice(ind, 1);//从目标中删除该层楼(肯定处于该方向S态)
+						}
+					}
+				},
+				DC: function (eleId, floorId) { //电梯e在f楼S态，尝试关门，然后移动态或待机态
+					if (this.S(eleDirs.U, eleId, floorId)) {
+						this.setSS(eleDirs.U, eleId, floorId);
+						return;
+					}
+					else if (this.S(eleDirs.D, eleId, floorId)) {
+						this.setSS(eleDirs.D, eleId, floorId);
+						return;
+					}
+					else if (this.S(eleDirs.N, eleId, floorId)) {
+						this.setSS(eleDirs.N, eleId, floorId);
+						return;
+					}
+					else if (this.SS(eleDirs.U, eleId, floorId)) {
+						this.setSSS(eleDirs.U, eleId, floorId);
+						return;
+					}
+					else if (this.SS(eleDirs.D, eleId, floorId)) {
+						this.setSSS(eleDirs.D, eleId, floorId);
+						return;
+					}
+					else if (this.SS(eleDirs.N, eleId, floorId)) {
+						this.setSSS(eleDirs.N, eleId, floorId);
+						return;
+					}
+					else if (this.SSS(eleDirs.U, eleId, floorId)) {
+						this.setM(eleDirs.U, eleId, floorId);
+					}
+					else if (this.SSS(eleDirs.D, eleId, floorId)) {
+						this.setM(eleDirs.D, eleId, floorId);
+					}
+					else if (this.SSS(eleDirs.N, eleId, floorId)) {
+						if (this.NA(eleId))
+							this.setW(eleId, floorId);
+						else if (this.ele[eleId].eleAids[eleDirs.U].length > 0)
+							this.setM(this.ele[eleId].eleAids[eleDirs.U][0] < floorId ? eleDirs.D : eleDirs.U, eleId, floorId);
+						else
+							this.setM(this.ele[eleId].eleAids[eleDirs.D][0] > floorId ? eleDirs.U : eleDirs.D, eleId, floorId);
+					}
+				},
+				ST: function (eleId, floorId) { //电梯e即将到达f层，查询看看要不要停下，需要就调用setS开门、调用EAF删目标，调用setS换方向、调用EAF删除目标，不需要就继续走
+					let dir = eleDirs.N;//当前电梯方向
+					let dir2 = eleDirs.N;//反方向
+					if (this.getM(eleDirs.U, eleId, floorId)) dir = eleDirs.U, dir2 = eleDirs.D;
+					else if (this.getM(eleDirs.D, eleId, floorId)) dir = eleDirs.D, dir2 = eleDirs.U;
+					else {//没在动就检查需不需要启动
+						return;
+					}
+					let aids1 = this.ele[eleId].eleAids[dir], aids2 = this.ele[eleId].eleAids[dir2];
+					let ind1 = aids1.indexOf(floorId), ind2 = aids2.indexOf(floorId);
+					if (ind1 != -1) {//当前楼层是该方向的目标
+						this.setS(dir, eleId, floorId);//先开门
+						this.EAF(eleId, floorId);//触发到达事件并删除该请求
+						if (this.NA(eleId)) {
+							this.setS(eleDirs.N, eleId, floorId);
+						}
+						else if (this.NC(dir, eleId, floorId)) {
+							this.setS(dir2, eleId, floorId);
+							this.EAF(eleId, floorId);//换向后再次到达
+						}
+						//有目标且不用转向，就不用改S
+					}
+					else if (ind2 != -1) {//不是同向目标，但是反向目标
+						//找当前路径上的极值
+						let mxaid = floorId, mnaid = floorId;
+						if (this.ele[eleId].eleAids[eleDirs.U].length > 0) {
+							mxaid = Math.max(mxaid, this.ele[eleId].eleAids[eleDirs.U][this.ele[eleId].eleAids[eleDirs.U].length - 1]);
+							mnaid = Math.min(mnaid, this.ele[eleId].eleAids[eleDirs.U][0]);
+						}
+						if (this.ele[eleId].eleAids[eleDirs.D].length > 0) {
+							mxaid = Math.max(mxaid, this.ele[eleId].eleAids[eleDirs.D][0]);
+							mnaid = Math.min(mnaid, this.ele[eleId].eleAids[eleDirs.D][this.ele[eleId].eleAids[eleDirs.D].length - 1]);
+						}
+						if ((dir == eleDirs.D ? mnaid : mxaid) == floorId) {//如果同向目标和反向目标里都没有更进一步的，就在这开门
+							this.setS(dir2, eleId, floorId);
+							this.EAF(eleId, floorId);
+							if (this.NA(eleId)) {
+								this.setS(eleDirs.N, eleId, floorId);
+							}
+						}
+						else {//否则继续
+							this.setM(dir, eleId, floorId + (dir == eleDirs.U ? 1 : -1));
+						}
+					}
+					else {//当前楼层不是目标，就继续运行
+						if (this.NA(eleId)) {//没有目标就停下
+							this.setW(eleId, floorId);
+						}
+						else if (this.NC(dir, eleId, floorId)) {
+							this.setM(dir2, eleId, floorId + (dir2 == eleDirs.U ? 1 : -1));
+						}
+						else {
+							this.setM(dir, eleId, floorId + (dir == eleDirs.U ? 1 : -1));
+						}
+					}
+				},
+				RL: function (dir, eleId, floorId) { //给电梯e发送以方向d到f的需求
+					if (this.ele[eleId].eleAids[dir].indexOf(floorId) == -1) {
+						this.ele[eleId].eleAids[dir].push(floorId);
+					}
+					if (dir == eleDirs.U) {
+						this.ele[eleId].eleAids[dir].sort(function (a, b) { return a - b; });//向上升序
+					}
+					else {
+						this.ele[eleId].eleAids[dir].sort(function (a, b) { return b - a; });//向下降序
+					}
+					if (this.getW(eleId, this.ele[eleId].elePos)) {//如果待机，就让它动起来，因为从内部按，就不用开门了
+						this.setM(this.ele[eleId].elePos > floorId ? eleDirs.D : eleDirs.U, eleId, this.ele[eleId].elePos);
+					}
+				},
+
+				//--------------------------------------其他区-------------------------------------------------
+				tickDC: function () { //每秒更新状态，先尝试所有关门
+					for (let eleId = 1; eleId <= this.eleNum; eleId++) {//DC事件发生
+						this.DC(eleId, this.ele[eleId].elePos);
+					}
+				},
+				tickST: function () { //再尝试所有开门
+					for (let eleId = 1; eleId <= this.eleNum; eleId++) {//ST事件发生
+						this.ST(eleId, this.ele[eleId].elePos);
+					}
+				}
+			},
+			created: function () { //设置初始 数据，系统自动调用
+				console.log('created 创建完毕');
+				let u = window.document.location.href.toString().split("?");//获取get参数
+				if (typeof (u[1]) == "string") {
+					u = u[1].split("&");//分解get参数
+					let get = {};
+					for (let i in u) {
+						let j = u[i].split("=");
+						get[j[0]] = parseInt(j[1]).toString() == 'NaN' ? 16 : j[1];
+					}
+					this.$set(this, 'eleNum', Math.min(Math.max(parseInt(get['ele']), 1), 5));
+					this.$set(this, 'floorNum', Math.min(Math.max(parseInt(get['floor']), 2), 16));
+				}
+				//设置初始状态
+				for (let i = 0; i <= this.eleNum; i++) {
+					oneEle = new Object();
+					oneEle.elePos = 1;//一开始都在一楼
+					oneEle.eleDir = eleDirs.N;//方向未定
+					oneEle.eleStatus = eleStatuses.W;//待机
+					oneEle.eleBtnStatus = new Array();
+					oneEle.eleAids = [new Array(), new Array()];
+
+					// this.elePos.push(1);//一开始都在一楼
+					// this.eleDir.push(eleDirs.N);//方向未定
+					// this.eleStatus.push(eleStatuses.W);//待机
+					// this.eleBtnStatus.push(new Array());
+					// this.eleAids[eleDirs.U].push(new Array());
+					// this.eleAids[eleDirs.D].push(new Array());
+
+					for (let j = 0; j <= this.floorNum; j++) {
+						oneEle.eleBtnStatus.push(btnStatuses.OFF);
+						// this.eleBtnStatus[i].push(btnStatuses.OFF);
+					}
+					this.ele.push(oneEle);
+				}
+				for (let i = 0; i <= this.floorNum; i++) {
+					oneFloor = new Object();
+					oneFloor.floorBtnStatus = [btnStatuses.OFF, btnStatuses.OFF];
+					oneFloor.floorBtnEleId = [1, 1];
+					this.floor.push(oneFloor);
+				}
+			},
+			mounted: function () { //启动定时任务，系统自动调用
+				console.log('mounted 挂载结束');
+				this.timerDC = setInterval(this.tickDC, 500);//0.5秒更新一次
+				setTimeout(() => {
+					this.timerST = setInterval(this.tickST, 500);//0.5秒更新一次
+				}, 250);
+			},
+			beforeDestroy: function () { //关闭定时任务，系统自动调用
+				console.log('beforeDestroy 销毁前');
+				clearInterval(this.timerDC);
+				clearInterval(this.timerST);
+			}
+		});
+	</script>
+</body>
+
+</html>
